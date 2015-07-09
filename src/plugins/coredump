@@ -1,0 +1,85 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Disable coredump plugin
+#
+
+source "utils/utils.sh"
+
+LIMITS_SETTING='* hard core 0'
+LIMITS_CONF_FILE="/etc/security/limits.conf"
+
+SYSCTL_SETTING="fs.suid_dumpable = 0"
+SYSCT_SETTING_REGEX='fs.suid_dumpable.*=.*0'
+SYSCTL_CONF_FILE="/etc/sysctl.conf"
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+disable_coredump() {
+	utils.log "coredump" "Checking coredump status"
+	utils.if_setting_exists "${LIMITS_CONF_FILE}" "${LIMITS_SETTING}"
+	local limits_exists="${?}"
+
+	utils.if_setting_exists "${SYSCTL_CONF_FILE}" "${SYSCT_SETTING_REGEX}"
+	local systcl_exists="${?}"
+
+	if "${DRY}"; then
+		if [[ "${limits_exists}" -eq 0 ]]; then
+			utils.log_ok "coredump" "coredump is already disabled in ${LIMITS_CONF_FILE}. Nothing to change"
+		else
+			utils.log_warning "coredump" "coredump is not set in ${LIMITS_CONF_FILE}. Need to set"
+		fi
+
+		if [[ "${systcl_exists}" -eq 0 ]]; then
+			utils.log_ok "coredump" "coredump is already disabled in systcl. Nothing to change"
+		else
+			utils.log_warning "coredump" "coredump is not set in sysctl. Need to set"
+		fi
+
+		return
+	fi
+
+	if [[ "${limits_exists}" -ne 0 ]]; then
+		utils.log "coredump" "Updating ${LIMITS_CONF_FILE}"
+		echo "${LIMITS_SETTING}" >> "${LIMITS_CONF_FILE}"
+	fi
+
+	if [[ "${systcl_exists}" -ne 0 ]]; then
+		utils.log "coredump" "Updating ${SYSCTL_CONF_FILE}"
+		echo "${SYSCTL_SETTING}" >> "${SYSCTL_CONF_FILE}"
+
+		utils.log "coredump" "Reloading ${SYSCTL_CONF_FILE}"
+		sysctl -p
+	fi
+}
+
+main() {
+	utils.log_start_plugin "coredump"
+
+	parse_params "${@}"
+	disable_coredump
+
+	utils.log_end_plugin "coredump"
+}
+
+main "${@}"

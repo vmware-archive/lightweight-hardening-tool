@@ -1,0 +1,110 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Enable chrooted SFTP
+#
+
+source "utils/utils.sh"
+
+PAM_REGEX='^#* *UsePAM.*'
+PAM_SETTING="UsePAM yes"
+SSHD_CONF="/etc/ssh/sshd_config"
+SFTP_GRP="sftp_allowedUsers_grp"
+RECONFIG_CMD_REGEX="^Match Group"
+RECONFIG_CMD="\nMatch Group ${SFTP_GRP}\n\tChrootDirectory /storage/sftp/%u\n\tForceCommand internal-sftp\n\tAllowTcpForwarding no"
+USERS_FILE_DIR="/root/SFTPMove"
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+enable_chrooted_sftp() {
+
+	utils.log "sftp_enable_chroot" "Enabling chrooted environment through ${SSHD_CONF}"
+
+	[[ -f "${SSHD_CONF}" ]] || utils.die "${SSHD_CONF} does not exists"
+
+	utils.log "sftp_enable_chroot" "Adding new group:${SFTP_GRP} "
+	if [[ "$(grep ${SFTP_GRP} /etc/group)" != "" ]]; then
+		utils.log_warning "sftp_enable_chroot" "Group ${SFTP_GRP} already exists."
+	else
+		utils.log "sftp_enable_chroot" "Adding group:${SFTP_GRP}"
+		! "${DRY}" && groupadd "${SFTP_GRP}"
+		utils.log_ok "sftp_enable_chroot" "Group:${SFTP_GRP} was added"
+	fi
+
+	utils.log "sftp_enable_chroot" "Add existing sftp users to:${SFTP_GRP} new group"
+	if [[ -d "${USERS_FILE_DIR}" ]]; then
+		cat "${USERS_FILE_DIR}"/* | cut -d':' -f1 | while read -r user; do
+			utils.log "sftp_enable_chroot" "Addding user:${user} to group:${SFTP_GRP}"
+			! "${DRY}" && usermod -a -G "${SFTP_GRP}" "${user}"
+			utils.log_ok "sftp_enable_chroot" "User:${user} was added to group:${SFTP_GRP}"
+		done
+	else
+		utils.log_warning "sftp_enable_chroot" "${USERS_FILE_DIR} does not exists"
+	fi
+
+	if [[ $(grep "^#* *Subsystem[[:space:]]\+sftp" "${SSHD_CONF}") != "" ]]; then
+		utils.log "sftp_enable_chroot" "Configuring Subsystem"
+		! "${DRY}" && sed -i "s|^#* *Subsystem[[:space:]]\+sftp$|Subsystem       sftp    internal-sftp|" "${SSHD_CONF}"
+		utils.log_ok "sftp_enable_chroot" "Configured Subsystem"
+	else
+		utils.log "sftp_enable_chroot" "Configuring Subsystem"
+		! "${DRY}" && echo -e "Subsystem       sftp    internal-sftp" >> "${SSHD_CONF}"
+		utils.log_ok "sftp_enable_chroot" "Configured Subsystem"
+	fi
+
+	if [[ "$(grep "${RECONFIG_CMD_REGEX}" "${SSHD_CONF}")" = "" ]]; then
+		utils.log "sftp_enable_chroot" "Configuring chroot"
+		! "${DRY}" &&echo -e "${RECONFIG_CMD}" >> "${SSHD_CONF}"
+		utils.log_ok "sftp_enable_chroot" "Configured chroot"
+	fi
+
+	utils.log "sftp_enable_chroot" "Configuring PAM"
+	if ! "${DRY}"; then
+		if grep -q "${PAM_REGEX}" "${SSHD_CONF}"; then
+			utils.log "sftp_enable_chroot" "Found PAM setting. Setting PAM to ${PAM_SETTING}"
+			sed -i "s/${PAM_REGEX}/${PAM_SETTING}/g" "${SSHD_CONF}"
+		else
+			utils.log_warning "sftp_enable_chroot" "PAM setting not found. Need to configure"
+			echo "${PAM_SETTING}" >> "${SSHD_CONF}"
+		fi
+		utils.log_ok "sftp_enable_chroot" "PAM is successfully set to ${PAM_SETTING}"
+	fi
+
+	utils.log "sftp_enable_chroot" "Restarting sshd service"
+	if ! service sshd restart >& /dev/null; then
+		utils.log_error "sftp_enable_chroot" "Could not restart sshd service. A restart is required in order for changes to take effect"
+	else
+		utils.log_ok "sftp_enable_chroot" "Successfully enabled chrooted SFTP"
+	fi
+}
+
+main() {
+	utils.log_start_plugin "sftp_enable_chroot"
+
+	parse_params "${@}"
+	enable_chrooted_sftp
+
+	utils.log_end_plugin "sftp_enable_chroot"
+}
+
+main "${@}"

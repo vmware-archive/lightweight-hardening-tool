@@ -1,0 +1,83 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# iptables_all plugin
+#
+
+source "utils/utils.sh"
+
+INPUT_TCP_ALLOW_PORTS=("3333")
+INPUT_UDP_ALLOW_PORTS=()
+
+LOCAL_SUBNET="$(ip addr | grep 'inet.*eth0' | awk '{print $2}')"
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+install_iptables_rules() {
+	utils.log "iptables_all" "Setting the default policy to DROP"
+	if ! "${DRY}"; then
+		iptables -F
+		for chain in INPUT FORWARD
+		do
+			iptables -P "${chain}" DROP
+		done
+	fi
+
+	utils.log "iptables_all" "Setting OUTPUT policy to ACCEPT"
+	! "${DRY}" && iptables -P OUTPUT ACCEPT
+
+	utils.log "iptables_all" "Allowing loopback interface"
+	! "${DRY}" && iptables -A INPUT -i lo -j ACCEPT
+	! "${DRY}" && iptables -A INPUT -p icmp -j ACCEPT
+
+	utils.log "iptables_all" "Allowing RELATED,ESTABLISHED traffic"
+	! "${DRY}" && iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+	for port in "${INPUT_TCP_ALLOW_PORTS[@]}"
+	do
+		utils.log "iptables_all" "Setting rule chain:INPUT port:${port} protocol:tcp"
+		! "${DRY}" && utils.set_input_iptables_rule "${port}" "tcp" ""
+	done
+
+	for port in "${INPUT_UDP_ALLOW_PORTS[@]}"
+	do
+		utils.log "iptables_all" "Setting rule chain:INPUT port:${port} protocol:udp"
+		! "${DRY}" && utils.set_input_iptables_rule "${port}" "udp" ""
+	done
+
+	utils.log "iptables_all" "Saving iptables rules"
+	! "${DRY}" && service iptables save >& /dev/null
+
+	utils.log_ok "iptables_all" "Finished iptables_all configuration"
+}
+
+main() {
+	utils.log_start_plugin "iptables_all"
+
+	parse_params "${@}"
+	install_iptables_rules
+
+	utils.log_end_plugin "iptables_all"
+}
+
+main "${@}"

@@ -1,0 +1,54 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# remove_xinetd package
+#
+
+source "utils/utils.sh"
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+remove_xinetd() {
+	utils.log "remove_xinetd" "removing xinetd package"
+
+	if ! "${DRY}"; then
+		yum -y remove xinetd >& /dev/null
+
+		if ! rpm -q xinetd >& /dev/null; then
+			utils.log_error "remove_xinetd" "Failed to remove xinetd. Need to remove package"
+		else
+			utils.log_ok "remove_xinetd" "Successfully removed xinetd"
+		fi
+	fi
+}
+
+main() {
+	utils.log_start_plugin "remove_xinetd"
+
+	parse_params "${@}"
+	remove_xinetd
+
+	utils.log_end_plugin "remove_xinetd"
+}
+
+main "${@}"

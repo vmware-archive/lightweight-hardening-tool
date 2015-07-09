@@ -1,0 +1,70 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Enable gpgcheck=1 for all repos plugin
+#
+
+source "utils/utils.sh"
+
+REPOS_DIR="/etc/yum.repos.d"
+GPG_CHECK_SETTING="gpgcheck=1"
+GPG_CHECK_SETTING_OFF="gpgcheck=0"
+GPG_CHECK_REGEX="gpgcheck="
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+set_gpg_check() {
+	local in_repo_section="false"
+	local found_gpg_check="false"
+
+	utils.log "yum_repos_gpg_check" "Checking repositories files under ${REPOS_DIR}"
+	for repo in ${REPOS_DIR}/*.repo; do
+		grep -q "${GPG_CHECK_REGEX}" "${repo}"
+		local exist="${?}"
+
+		if [[ "${exist}" -eq 0 ]]; then
+			if grep -q "${GPG_CHECK_SETTING_OFF}" "${repo}"; then
+				utils.log_warning "yum_repos_gpg_check" "${repo} is set with ${GPG_CHECK_SETTING_OFF}. Need to change"
+				if ! "${DRY}"; then
+					sed -i s/gpgcheck=0/${GPG_CHECK_SETTING}/g "${repo}"
+					utils.log_ok "yum_repos_gpg_check" "${repo} is set"
+				fi
+			else
+				utils.log_ok "yum_repos_gpg_check" "${repo} is set with gpgcheck=1. Nothing to change"
+			fi
+		else
+			utils.log_warning "yum_repos_gpg_check" "${repo} is missing ${GPG_CHECK_REGEX} setting. Please check"
+		fi
+	done
+}
+
+main() {
+	utils.log_start_plugin "yum_repos_gpg_check"
+
+	parse_params "${@}"
+	set_gpg_check
+
+	utils.log_end_plugin "yum_repos_gpg_check"
+}
+
+main "${@}"

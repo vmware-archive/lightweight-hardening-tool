@@ -1,0 +1,62 @@
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+%global	package_version @PACKAGE_VERSION@
+%global	package_name @PACKAGE_NAME@
+
+Name:		%{package_name}
+Version:	@PACKAGE_RPM_VERSION@
+Release:	@PACKAGE_RPM_RELEASE@%{?release_suffix}
+Summary:	Hardening Scripts
+Group:		System Environment/Base
+License:	http://www.vmware.com
+Source:		%{name}-%{package_version}.tar.gz
+
+URL:		http://www.vmware.com
+
+BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}
+BuildArch:	noarch
+
+BuildRequires:	automake
+BuildRequires:	autoconf
+
+%description
+This package contains the hardening files
+
+%prep
+%setup -q -n "%{package_name}-%{package_version}"
+
+%build
+%configure \
+	--docdir="%{_docdir}/%{name}-%{version}"
+
+make %{?_smp_mflags}
+
+%install
+rm -rf %{buildroot}
+make %{?_smp_mflags} install DESTDIR="%{buildroot}"
+
+%files
+%dir %{_datadir}/%{package_name}
+%{_datadir}/%{package_name}/*
+%doc AUTHORS
+%doc COPYING
+%{_mandir}/man8/*
+
+%changelog
+* Thu Jul 09 2015 Kiril Nesenko <knesenko@vmware.com> - 1.0.0_master
+- Initial packaging.

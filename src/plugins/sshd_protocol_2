@@ -1,0 +1,65 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# protocol 2 plugin
+#
+
+source "utils/utils.sh"
+
+SSH_CONF="/etc/ssh/sshd_config"
+RECONFIG_COMMAND='\n\n# Reconfiguring to protocol version 2\nProtocol 2'
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+enforce_sshd_protocol_2() {
+	utils.log "sshd_protocol_2" "Reconfiguring to protocol 2"
+	[[ -f "${SSH_CONF}" ]] || utils.die "${SSH_CONF} does not exists"
+
+	if [[ $(grep "^#* *Protocol [0-9]$" "${SSH_CONF}") != "" ]]; then
+		utils.log "sshd_protocol_2" "Setting Protocol 2"
+		! "${DRY}" && sed -i 's/^#* *\(Protocol\) [0-9]/\1 2/g' "${SSH_CONF}"
+		utils.log_ok "sshd_protocol_2" "Set Protocol 2"
+	else
+		utils.log "sshd_protocol_2" "Setting Protocol 2"
+		! "${DRY}" && echo -e "${RECONFIG_COMMAND}" >> "${SSH_CONF}"
+		utils.log_ok "sshd_protocol_2" "Set Protocol 2"
+	fi
+
+	utils.log "sshd_protocol_2" "Restarting ssh service"
+	if ! service sshd restart >& /dev/null; then
+		utils.log_error "sshd_protocol_2" "Could not restart ssh service. A restart is required in order for changes to take effect"
+	else
+		utils.log_ok "sshd_protocol_2" "Finished protocol configuration"
+	fi
+}
+
+main() {
+	utils.log_start_plugin "sshd_protocol_2"
+
+	parse_params "${@}"
+	enforce_sshd_protocol_2
+
+	utils.log_end_plugin "sshd_protocol_2"
+}
+
+main "${@}"

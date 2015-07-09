@@ -1,0 +1,53 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# umask plugin
+#
+
+source "utils/utils.sh"
+
+BASHRC="/etc/bashrc"
+PROFILE="/etc/profile"
+LOGIN_DEFS="/etc/login.defs"
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+set_default_umask_all_users() {
+
+	utils.log "umask_default" "Changing default umask values in ${BASHRC}, ${PROFILE}, and ${LOGIN_DEFS} to 0027"
+	! "${DRY}" &&  sed -i 's/^\( *umask\) [0-9]\{3,4\}$/\1 0027/g' "${BASHRC}" "${PROFILE}"
+	! "${DRY}" &&  sed -i 's/^\(UMASK *\)[0-9]\{3,4\}/\1 0027/g' "${LOGIN_DEFS}"
+
+	utils.log_ok "umask_default" "Default umask changed for all users"
+}
+
+main() {
+	utils.log_start_plugin "umask_default"
+
+	parse_params "${@}"
+	set_default_umask_all_users
+
+	utils.log_end_plugin "umask_default"
+}
+
+main "${@}"

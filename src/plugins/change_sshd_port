@@ -1,0 +1,64 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# change_sshd_port
+#
+
+source "utils/utils.sh"
+
+SSHD_CONF="/etc/ssh/sshd_config"
+SSH_PORT="3333"
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+change_sshd_port() {
+
+	utils.log "change_sshd_port" "Changing default port to port ${SSH_PORT}"
+
+	[[ -f "${SSHD_CONF}" ]] || utils.die "${SSHD_CONF} does not exists"
+	if [[ $(grep "^#* *Port[[:space:]]\+[0-9]\+" "${SSHD_CONF}") != "" ]]; then
+		utils.log "change_sshd_port" "Changing port to:${SSH_PORT}"
+		! "${DRY}" && sed -i "s/^#* *Port[[:space:]]\+[0-9]\+/Port ${SSH_PORT}/" "${SSHD_CONF}"
+		utils.log "change_sshd_port" "Changed port to:${SSH_PORT}"
+	else
+		! "${DRY}" && echo -e "Port ${SSH_PORT}" >> "${SSHD_CONF}"
+	fi
+
+	utils.log "change_sshd_port" "Restarting sshd service"
+	if ! service sshd restart >& /dev/null; then
+		utils.log_error "change_sshd_port" "Could not restart sshd service. A restart is required in order for changes to take effect"
+	else
+		utils.log_ok "change_sshd_port" "Successfully changed default port to port ${SSH_PORT}"
+	fi
+}
+
+main() {
+	utils.log_start_plugin "change_sshd_port"
+
+	parse_params "${@}"
+	change_sshd_port
+
+	utils.log_end_plugin "change_sshd_port"
+}
+
+main "${@}"

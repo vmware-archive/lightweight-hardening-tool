@@ -1,0 +1,77 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Disable the wireless modules
+#
+
+source "utils/utils.sh"
+
+MODPROBE_DIR="/etc/modprobe.d"
+WIFI_BLACKLIST="${MODPROBE_DIR}/blacklist-wireless.conf"
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+disable_wireless() {
+	utils.log "disable_wireless" "Blacklist wireless kernel modules"
+
+	[[ -d "${MODPROBE_DIR}" ]] || utils.die "${MODPROBE_DIR} does not exists"
+
+	echo > "${WIFI_BLACKLIST}"
+	local kernel_release="$(uname -r)"
+	#get wireless modules:
+	WIFI=($(find /lib/modules/${kernel_release}/kernel/drivers/net/wireless -name "*.ko" \
+		-type f -printf "%f\n" \
+		| cut -d'.' -f1))
+
+	#blacklist the modules so that they will not be loaded automatically:
+	if ! "${DRY}"; then
+		for module in "${WIFI[@]}"
+		do
+			utils.log "disable_wireless" "Writing:blacklist ${module} into:${WIFI_BLACKLIST}"
+			echo "blacklist ${module}" >> "${WIFI_BLACKLIST}"
+		done
+	fi
+
+	#modules may be loaded if another non-blacklisted module depends on it or if it is loaded manually - force the module to always fail loading,
+	#Pay attention - This will effectively blacklist the module and any other that depends on it.
+	if ! "${DRY}"; then
+		for module in "${WIFI[@]}"
+		do
+			utils.log "disable_wireless" "Writing:install ${module} /bin/true into:${WIFI_BLACKLIST}"
+			echo "install ${module} /bin/true" >> "${WIFI_BLACKLIST}"
+		done
+	fi
+
+	utils.log_ok "disable_wireless" "Wireless modules will be blacklisted on next reboot"
+}
+
+main() {
+	utils.log_start_plugin "disable_wireless"
+
+	parse_params "${@}"
+	disable_wireless
+
+	utils.log_end_plugin "disable_wireless"
+}
+
+main "${@}"

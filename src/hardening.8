@@ -1,0 +1,43 @@
+.TH SECURE.SH "1" "September 2014" "secure.sh" "User Commands"
+.SH NAME
+secure.sh \- manual page for secure.sh
+.SH DESCRIPTION
+.PP
+hardening is a tool that was developed in a plugable way. It should be used to harden RHEL family servers. Tool uses plugins and profiles.
+.PP
+Plugin is a shell scipt that is used to secure some system component.
+Profile includes a bunch of pluings. Each line represents a plugin.
+Main script for this tool is secure.sh
+.PP
+.SH OPTIONS
+The following are general options you can use with this command.
+.IP "\fB\-h|\-\-help\fP"
+shows help message
+.IP "\fB\\-\-dry\fP"
+executes the tool in the dry mode (wont change anything)
+.IP "\fB\-\-profile=PROFILE_NAME\fP"
+profile you want to use (could be found under profiles directory)
+.IP "\fB\-\-plugin={plugin1,plugin2...}\fP"
+list of plugins you want to run (ssh,dns...)
+.IP "\fB\-\-plugin\-params='param1 param2'\fB"
+list of plugins parameters
+.IP "\fB\-\-profile-params={plugin_name:'param1,param'@plugin_name:'param1,param'}\fP"
+list of profile params
+.PP
+.SH EXAMPLES
+.IP "\fBRun one cron pluign\fP"
+secure.sh \-\-plugin=cron
+.IP "\fBRun one cron pluign with dry option\fP"
+secure.sh \-\-plugin=cron \-\-dry
+.IP "\fBRun one cron plugin with parameters\fP"
+secure.sh \-\-plugin=cron \-\-plugin_params='param1 param2'
+.IP "\fBRun two plugins:cron,iptables_all\fP"
+secure.sh \-\-plugin=cron,iptables_all
+.IP "\fBRun profile:base\fP"
+secure.sh \-\-plugin=base
+.IP "\fBRun two profiles: base,nlrs\fP"
+secure.sh \-\-profile=base,nlrs
+.IP "\fBRun two profiles: base,profile with parameters\fP"
+secure.sh \-\-profile=base,profile \-\-profile_params=base:param1,param2@profile:param1
+.SH AUTHOR
+.IP "\fBKiril Nesenko \<knesenko@vmware.com\>\fP"

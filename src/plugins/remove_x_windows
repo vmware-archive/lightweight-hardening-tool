@@ -1,0 +1,60 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Remove X Windows System plugin
+#
+
+source "utils/utils.sh"
+
+GROUP_NAME="X Window System"
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+remove_x_window() {
+	local installed="false"
+
+	utils.log "remove_x_windows" "Checking if ${GROUP_NAME} installed"
+	rpm -q $(yum groupinfo "${GROUP_NAME}" | tail -n1) >& /dev/null && installed="true"
+
+	if "${installed}"; then
+		utils.log_warning "remove_x_windows" "${GROUP_NAME} is installed on the system. Need to remove"
+
+		if ! "${DRY}"; then
+			yum -y groupremove "${GROUP_NAME}"
+			utils.log_ok "remove_x_windows" "${GROUP_NAME} was removed from the system"
+		fi
+	else
+		utils.log_ok "remove_x_windows" "${GROUP_NAME} is not installed on the system. Nothing to do"
+	fi
+}
+
+main() {
+	utils.log_start_plugin "remove_x_windows"
+
+	parse_params "${@}"
+	remove_x_window
+
+	utils.log_end_plugin "remove_x_windows"
+}
+
+main "${@}"

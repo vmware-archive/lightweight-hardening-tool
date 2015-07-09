@@ -1,0 +1,74 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# sysctl plugin
+#
+
+source "utils/utils.sh"
+SYSCTL_CONF="/etc/sysctl.conf"
+SYSCTL_TEMPLATE="conf_files/sysctl.conf"
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+install_sysctl() {
+	utils.log "sysclt" "Installing sysctl configuration file"
+	[[ -f "${SYSCTL_TEMPLATE}" ]] || utils.die "${SYSCTL_TEMPLATE} does not exists"
+
+	utils.log "sysclt" "Backing up ${SYSCTL_CONF}"
+	! "${DRY}" && cp "${SYSCTL_CONF}" "${SYSCTL_CONF}.$(date +%Y%m%d%H%M%S).bak"
+
+	utils.log "sysctl" "Installing sysctl.conf"
+	if ! "${DRY}"; then
+		cat "${SYSCTL_TEMPLATE}" | while read line; do
+			[[ "${line}" =~ ^#  \
+				|| "${line}" =~ ^$ ]] && continue
+			local setting_key="$(echo "${line}" | sed 's/ //g' | cut -d'=' -f1)"
+			local setting_value="$(echo "${line}" | sed 's/ //g' | cut -d'=' -f2)"
+
+			if grep -q "${setting_key}" "${SYSCTL_CONF}"; then
+				utils.log "sysctl" "Going to update ${setting_key} with value ${setting_value}"
+				sed -i "s/${setting_key}.*/${line}/g" "${SYSCTL_CONF}"
+			else
+				utils.log "sysctl" "Adding ${line} to ${SYSCTL_CONF}"
+				echo "${line}" >> "${SYSCTL_CONF}"
+			fi
+		done
+	fi
+	utils.log_ok "sysctl" "sysctl.conf was installed"
+
+	utils.log "sysclt" "Reloading sysclt settings"
+	! "${DRY}" && sysctl -p >& /dev/null
+
+	utils.log_ok "sysclt" "plugin configuration finished"
+}
+
+main() {
+	utils.log_start_plugin "sysclt"
+
+	parse_params "${@}"
+	install_sysctl
+
+	utils.log_start_plugin "sysclt"
+}
+
+main "${@}"

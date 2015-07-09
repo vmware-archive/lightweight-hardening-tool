@@ -1,0 +1,65 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Selinux plugin
+#
+
+source "utils/utils.sh"
+
+SELINUX_FILES="/etc/sysconfig/selinux /etc/selinux/config"
+SELINUX_SETTING="SELINUX=disabled"
+SELINUX_REGEX='^SELINUX=.*'
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+set_selinux() {
+	utils.log "selinux" "Checking selinux setting"
+	local runtime_status="$(getenforce)"
+
+	if [[ "${runtime_status}" = "Enforcing" || "${runtime_status}" = "Permissive" ]]; then
+		utils.log_warning "selinux" "Selinux is running status. Need to disable"
+
+		if ! "${DRY}"; then
+			utils.log "selinux" "Disabling Selinux"
+			setenforce 0
+			sed -i s/${SELINUX_REGEX}/${SELINUX_SETTING}/g ${SELINUX_FILES}
+
+			utils.log_ok "selinux" "Selinux was disabled. Please reboot the server"
+		fi
+	elif [[ "${runtime_status}" = "Disabled" ]]; then
+		utils.log_ok "selinux" "Selinux is already disabled. Nothing to change"
+	else
+		utils.log_warning "selinux" "Cannot check Selinux status. Please check manually"
+	fi
+}
+
+main() {
+	utils.log_start_plugin "selinux"
+
+	parse_params "${@}"
+	set_selinux
+
+	utils.log_end_plugin "selinux"
+}
+
+main "${@}"

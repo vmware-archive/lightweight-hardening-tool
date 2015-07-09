@@ -1,0 +1,82 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# NTP client plugin
+#
+
+source "utils/utils.sh"
+
+PKG_NAME="ntpdate"
+NTP_PORT="123"
+NTP_PROTO="udp"
+CRON_DIR="/etc/cron.daily"
+CRON_NTP="conf_files/ntpdate_cron"
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+install_pkg() {
+	rpm -q "${PKG_NAME}" >& /dev/null || yum -y install "${PKG_NAME}"
+}
+
+install_cron() {
+	if [[ ! -f "${CRON_NTP}" ]]; then
+		utils.log_error "ERROR" "${CRON_NTP} does not exist"
+		utils.die "${CRON_NTP} does not exist"
+	fi
+
+	# dry mode
+	if "${DRY}"; then
+		utils.log "ntp-client" "Will install cron under ${CRON_DIR}"
+		if [[ ! -f "${CRON_DIR}/${CRON_NTP##*/}" ]]; then
+			utils.log "ntp-client" "${CRON_DIR}/${CRON_NTP##*/} not found"
+			return
+		fi
+
+		diff "${CRON_NTP}" "${CRON_DIR}/${CRON_NTP##*/}" >& /dev/null
+		local ret="${?}"
+
+		if [[ "${ret}" -eq 0 ]]; then
+			utils.log "ntp-client" "Files are same. Nothing to change"
+		else
+			utils.log "ntp-client" "Diff found. There are some changes between the cronjobs"
+		fi
+
+		return
+	fi
+
+	utils.log "ntp-client" "Installing cron under ${CRON_DIR}"
+	cp -f "${CRON_NTP}" "${CRON_DIR}"
+	utils.log_ok "ntp-client" "Installed cron under ${CRON_DIR}"
+}
+
+main() {
+	utils.log_start_plugin "ntp-client"
+
+	parse_params "${@}"
+	install_pkg
+	install_cron
+
+	utils.log_end_plugin "ntp-client"
+}
+
+main "${@}"

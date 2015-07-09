@@ -1,0 +1,91 @@
+#!/bin/bash
+
+#
+# hardening -- hardening tool for Linux servers
+# Copyright (C) 2014-2015 VMware, Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# polyinstantiation plugin
+#
+
+source "utils/utils.sh"
+
+SECURITY_CONF="/etc/security/namespace.conf"
+VAR_POLY_DIR="/var/tmp/tmp-inst"
+TMP_POLY_DIR="/tmp/tmp-inst"
+VAR_DIR="/var"
+TMP_DIR="/tmp"
+
+PAM_SETTING="# Polyinstantiation
+session required pam_namespace.so"
+
+PAM_SETTING_REGEX='^session.*required.*pam_namespace.so$'
+PAM_CONFIG_FILES=("/etc/pam.d/login" "/etc/pam.d/sshd")
+
+SETTINGS="/tmp     /tmp-inst/            level      root,adm
+/var/tmp /var/tmp/tmp-inst/    level      root,adm"
+
+enable_polyinstantiation() {
+	utils.log "polyinstantiation" "Checking for current polyinstantiation configuration"
+
+	if grep -q '^[^#]' "${SECURITY_CONF}"; then
+		utils.log_warning "polyinstantiation" "Seems like we have already configured polyinstantiation. Still need to reconfigure"
+	else
+		utils.log_warning "polyinstantiation" "polyinstantiation is not configured on the system. Need to reconfigure"
+	fi
+
+	utils.log "polyinstantiation" "Reconfiguring polyinstantiation under ${SECURITY_CONF}"
+	if ! "${DRY}"; then
+		utils.log "polyinstantiation" "Cleaning ${SECURITY_CONF}"
+		sed -i 's/^[^#].*//g' "${SECURITY_CONF}"
+
+		utils.log "polyinstantiation" "Creating ${VAR_POLY_DIR} and ${TMP_POLY_DIR}"
+		mkdir -p "${VAR_POLY_DIR}" "${TMP_POLY_DIR}"
+		chown root:root "${VAR_POLY_DIR}" "${TMP_POLY_DIR}"
+		chmod 000 "${VAR_POLY_DIR}" "${TMP_POLY_DIR}"
+
+		utils.log "polyinstantiation" "Updating ${SECURITY_CONF}"
+
+		echo -e "${SETTINGS}" >> "${SECURITY_CONF}"
+	fi
+
+	utils.log "polyinstantiation" "Checking PAM configuration files"
+	for config in "${PAM_CONFIG_FILES[@]}"; do
+		utils.log "polyinstantiation" "Checking ${config}"
+		if grep -q "${PAM_SETTING_REGEX}" "${config}"; then
+			utils.log_ok "polyinstantiation" "${config} already configured. Nothing to do"
+		else
+			utils.log_warning "polyinstantiation" "${config} is not configured. Need to configure"
+			! "${DRY}" && echo -e "${PAM_SETTING}" >> "${config}"
+		fi
+	done
+}
+
+parse_params() {
+	local all_params="${@}"
+	DRY="$(echo "${all_params}" | cut -d' ' -f1)"
+}
+
+main() {
+	utils.log_start_plugin "polyinstantiation"
+
+	parse_params "${@}"
+	enable_polyinstantiation
+
+	utils.log_end_plugin "polyinstantiation"
+}
+
+main "${@}"
