@@ -3,7 +3,9 @@
 
 #####Build
 
-```./autogen.sh ; ./configure ; make dist ; rpmbuild -tb *.tar.gz```
+```
+./autogen.sh ; ./configure ; make dist ; rpmbuild -tb *.tar.gz
+```
 
 
 
@@ -31,7 +33,9 @@ The following are general options you can use with this command.
 
 Run one cron plugin
 
-```secure.sh --plugin=cron```
+```
+./secure.sh --plugin=cron
+```
 
 Run one cron pluign with dry option
 
